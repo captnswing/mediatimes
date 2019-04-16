@@ -1,0 +1,6 @@
+pandas==0.23.4
+jupyter==1.0.0
+matplotlib==3.0.2
+python-dateutil==2.7.5
+bashplotlib==0.6.5
+sparklines==0.4.2

@@ -1,0 +1,5 @@
+.python-version
+.ipynb_checkpoints
+exif
+*.shelve
+*.ipynb
