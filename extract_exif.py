@@ -5,18 +5,18 @@ import datetime
 import json
 import os
 import subprocess
+# https://opensource.com/article/18/4/python-datetime-libraries
 import arrow
 
 
 def get_earliest_date(exifdata, dry_run=False):
     exifdata = {**exifdata['File'], **exifdata['QuickTime']}
     datekeys = [k for k in exifdata.keys() if "date" in k.lower()]
-    print([exifdata[dk] for dk in datekeys])
-    parsed_dates = [arrow.get(exifdata[dk], ['YYYY:MM:DD HH:mm:ssZZ', 'YYYY:MM:DD HH:mm:ss']) for dk in datekeys]
     if dry_run:
         print(exifdata)
         print(datekeys)
         print(parsed_dates)
+    parsed_dates = [arrow.get(exifdata[dk], ['YYYY:MM:DD HH:mm:ssZZ', 'YYYY:MM:DD HH:mm:ss']).datetime for dk in datekeys]
     return min(parsed_dates)
 
 
@@ -29,7 +29,8 @@ def correct_dates(mediafile, d=None, dry_run=False):
         exif_data = subprocess.check_output(["/usr/local/bin/exiftool", "-g", "-j", mediafile])
         exif_data = json.loads(exif_data)[0]
         d = get_earliest_date(exif_data, dry_run)
-    assert (type(d) is arrow.Arrow)
+#    assert (type(d) is arrow.Arrow)
+    assert (type(d) is datetime.datetime)
     # https://productforums.google.com/d/msg/photos/oj96JZK14Fs/upbMBWvmAQAJ
     keys = ["AllDates",
             "FileModifyDate",
@@ -45,7 +46,8 @@ def correct_dates(mediafile, d=None, dry_run=False):
         cmd.append(templ.format(k))
     cmd.append("{}".format(mediafile))
     if dry_run:
-        print(cmd)
+        print(d, os.path.basename(mediafile))
+        # print(cmd)
     else:
         subprocess.check_output(cmd)
         ts = int(d.strftime("%s"))
