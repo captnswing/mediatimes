@@ -12,11 +12,12 @@ import arrow
 def get_earliest_date(exifdata, dry_run=False):
     exifdata = {**exifdata['File'], **exifdata['QuickTime']}
     datekeys = [k for k in exifdata.keys() if "date" in k.lower()]
-    if dry_run:
-        print(exifdata)
-        print(datekeys)
-        print(parsed_dates)
     parsed_dates = [arrow.get(exifdata[dk], ['YYYY:MM:DD HH:mm:ssZZ', 'YYYY:MM:DD HH:mm:ss']).datetime for dk in datekeys]
+    # if dry_run:
+    #     print("-"*50)
+    #     print(exifdata)
+    #     print(datekeys)
+    #     print(parsed_dates)
     return min(parsed_dates)
 
 
