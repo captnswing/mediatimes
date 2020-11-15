@@ -2,10 +2,13 @@
 # -*- coding: utf-8 -*-
 import datetime
 import json
+import multiprocessing
 import os
 import shutil
 import argparse
 import subprocess
+from itertools import zip_longest
+
 import arrow
 
 
@@ -52,6 +55,11 @@ def get_earliest_date(mediafile):
     return min(parsed_dates)
 
 
+def grouper(iterable, n):
+    args = [iter(iterable)] * n
+    return zip_longest(*args)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='renames all movie files in a directory with creation date in their name')
@@ -59,13 +67,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
     os.chdir(args.targetfolder)
 
-    for fn in os.listdir(os.curdir):
-        if not os.path.isfile(fn):
-            continue
-        d = get_earliest_date(fn)
-        monthfolder = d.format('YYYY-MM')
-        if not os.path.exists(monthfolder):
-            os.makedirs(monthfolder)
-        newfn = os.path.join(monthfolder, fn)
-        shutil.move(fn, newfn)
-        print(f"{fn:<30} -> {newfn:<}")
+    pool = multiprocessing.Pool()
+    mediafiles = [fn for fn in os.listdir(os.curdir) if os.path.isfile(fn) and fn != ".DS_Store"]
+    chunk_size = multiprocessing.cpu_count()
+    print(len(mediafiles), chunk_size)
+    for g in grouper(mediafiles, chunk_size):
+        files = list(filter(None, g))
+        # print(files)
+        dates = pool.map(get_earliest_date, files)
+        for i, f in enumerate(files):
+            monthfolder = dates[i].format('YYYY-MM')
+            if not os.path.exists(monthfolder):
+                os.makedirs(monthfolder)
+            newfn = os.path.join(monthfolder, f)
+            shutil.move(f, newfn)
+            print(f"{f:<30} -> {newfn:<}")

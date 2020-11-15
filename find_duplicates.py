@@ -38,4 +38,4 @@ if __name__ == '__main__':
     files = ["IMG_4295-2.JPG", "IMG_4295.JPG", "IMG_42951.jpg"]
     for f in files:
         phash = subprocess.check_output(["/Users/hoffsummer/Downloads/phashconvert", f])
-        print phash
+        print(phash)

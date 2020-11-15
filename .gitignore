@@ -3,3 +3,4 @@
 exif
 *.shelve
 *.ipynb
+.idea

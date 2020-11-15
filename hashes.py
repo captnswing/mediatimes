@@ -1,20 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-import subprocess
 import re
 import argparse
-import shutil
 import hashlib
-import shelve
+import sys
 
 
 def getmd5hash(filename):
-    md5 = hashlib.md5()
+    file_hash = hashlib.md5()
+    BLOCK_SIZE = 128000000
     with open(filename, 'rb') as f:
-        for chunk in iter(lambda: f.read(128 * md5.block_size), ''):
-            md5.update(chunk)
-    return md5.hexdigest()
+        fb = f.read(BLOCK_SIZE)
+        while len(fb) > 0:  # While there is still data being read from the file
+            file_hash.update(fb)  # Update the hash
+            fb = f.read(BLOCK_SIZE)  # Read the next block from the file
+    return file_hash.hexdigest()
 
 
 def getallhashes():
@@ -23,7 +24,7 @@ def getallhashes():
         for filename in filenames:
             if re.match('^clip-.*\.mov$', filename):
                 fn = os.path.join(directory, filename)
-                print fn
+                print(fn)
                 md5h = getmd5hash(fn)
                 allhashes.append((md5h, fn))
     return allhashes
@@ -33,16 +34,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='rename movie files according to their hash')
     parser.add_argument("targetdir")
     args = parser.parse_args()
-    print args.targetdir
+    print(args.targetdir)
 
-    if os.path.isdir(args.targetdir):
-        os.chdir(args.targetdir)
-        items = os.listdir(os.curdir)
-    else:
-        items = [args.targetdir]
+    if not os.path.isdir(args.targetdir):
+        sys.exit(1)
 
     root = os.path.abspath(args.targetdir)
-    for directory, dirnames, filenames in os.walk(args.targetdir):
+    os.chdir(root)
+
+    for directory, dirnames, filenames in os.walk(os.curdir):
         for f in filenames:
             fn = os.path.join(directory, f)
             if f.startswith("."):
@@ -56,13 +56,5 @@ if __name__ == '__main__':
             if not os.path.exists(newfn):
                 os.rename(fn, newfn)
             else:
-                print newfn
-            print "{:<30} -> {:<}".format(fn, newfn)
-
-    # for item in items:
-    #     if item == ".DS_Store" or os.path.isdir(item):
-    #         continue
-    #     ext = os.path.splitext(item)[-1].lower()
-    #     newfn = getmd5hash(item)
-    #     newfn += ext
-    #     os.rename(item, os.path.join('..', newfn))
+                print(newfn)
+            print(f"{fn:<30} -> {newfn:<}")

@@ -44,4 +44,4 @@ if __name__ == '__main__':
         #     os.rename(fn, base+".mov")
         newfn = get_new_filename(fn)
         os.rename(fn, newfn)
-        print "{:<30} -> {:<}".format(fn, newfn)
+        print("{:<30} -> {:<}".format(fn, newfn))

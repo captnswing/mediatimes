@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
     a = []
     for directory, dirnames, filenames in os.walk(args.targetfolder):
-        print os.path.abspath(os.curdir)
+        print(os.path.abspath(os.curdir))
         for f in filenames:
             if f.endswith(".txt") or f == ".DS_Store":
                 continue
