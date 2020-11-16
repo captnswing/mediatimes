@@ -5,6 +5,27 @@ import subprocess
 
 video_formats = ['.3gp', '.avi', '.mov', '.mp4', '.mpg']
 image_formats = ['.gif', '.heic', '.jpeg', '.jpg', '.png']
+exif_config = "/Users/frahof/Development/private/iphoto-google/exif_args.cfg"
+
+
+def find_extensions():
+    extensions = set()
+    for root, dirs, files in os.walk("."):
+        for name in files:
+            extension = os.path.splitext(name)[1]
+            if extension == ".zip" or extension == "":
+                continue
+            extensions.add(extension.lower())
+    print(sorted(extensions))
+
+
+def print_merge_commands():
+    targetfolder = "/Volumes/Photos/Google Photos/"
+    archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("takeout-")])
+    for archive in archive_dirs:
+        merge_command = f"ditto '{archive}/Takeout/Google Photos' '{targetfolder}'"
+        print(f"echo '{archive}'")
+        print(merge_command)
 
 
 def extract_archives():
@@ -29,17 +50,6 @@ def verify_archives():
         subprocess.check_call(command.split())
 
 
-def find_extensions():
-    extensions = set()
-    for root, dirs, files in os.walk("."):
-        for name in files:
-            extension = os.path.splitext(name)[1]
-            if extension == ".zip" or extension == "":
-                continue
-            extensions.add(extension.lower())
-    print(sorted(extensions))
-
-
 def merge_edited():
     for root, dirs, files in os.walk("."):
         for name in files:
@@ -58,34 +68,25 @@ def remove_dsstore(dir):
                 os.remove(os.path.join(root, name))
 
 
-def exif_fix_archive_images():
+def exif_fix_archive():
     archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("takeout-")])
     # archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("19")])
-    a = archive_dirs[0]
-    remove_dsstore(a)
-    command = f"exiftool -@ /Users/frahof/Development/private/iphoto-google/exif_args_images.cfg {a}"
-    print(command)
-    try:
-        stderr_output = subprocess.check_call(command.split())#, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-    else:
-        print(stderr_output)
-
-
-def exif_fix_archive_videos():
-    archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("takeout-")])
-    # archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("19")])
-    a = archive_dirs[0]
-    remove_dsstore(a)
-    command = f"exiftool -@ /Users/frahof/Development/private/iphoto-google/exif_args_videos.cfg {a}"
-    print(command)
-    try:
-        stderr_output = subprocess.check_call(command.split())#, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-    else:
-        print(stderr_output)
+    for archive in archive_dirs[1:2]:
+        remove_dsstore(archive)
+        image_extensions = " ".join([f"-ext {format}" for format in image_formats])
+        video_extensions = " ".join([f"-ext {format}" for format in video_formats])
+        commands = [
+            f"exiftool -@ {exif_config} {image_extensions} {archive}",
+            f"exiftool -@ {exif_config} {video_extensions} {archive}"
+        ]
+        for cmd in [commands[1]]:
+            print(cmd)
+            try:
+                stderr_output = subprocess.check_call(cmd.split())  # , stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as exc:
+                print("Status : FAIL", exc.returncode, exc.output)
+            else:
+                print(stderr_output)
 
 
 if __name__ == "__main__":
@@ -96,4 +97,5 @@ if __name__ == "__main__":
     # extract_archives()
     # find_extensions()
     # merge_edited()
-    exif_fix_archive_videos()
+    print_merge_commands()
+    # exif_fix_archive()
