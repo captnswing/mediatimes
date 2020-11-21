@@ -3,8 +3,8 @@ import glob
 import shutil
 import subprocess
 
-video_formats = ['.3gp', '.avi', '.mov', '.mp4', '.mpg']
-image_formats = ['.gif', '.heic', '.jpeg', '.jpg', '.png']
+video_formats = ['.3gp', '.mov', '.mp4', '.mpg', '.m4v']  # '.m2ts', '.avi' cannot be written by exiftool yet
+image_formats = ['.gif', '.heic', '.jpeg', '.jpg', '.png', '.tiff']
 exif_config = "/Users/frahof/Development/private/iphoto-google/exif_args.cfg"
 
 
