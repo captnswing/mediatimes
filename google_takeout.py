@@ -2,30 +2,32 @@ import os
 import glob
 import shutil
 import subprocess
+import re
 
 video_formats = ['.3gp', '.mov', '.mp4', '.mpg', '.m4v']  # '.m2ts', '.avi' cannot be written by exiftool yet
 image_formats = ['.gif', '.heic', '.jpeg', '.jpg', '.png', '.tiff']
 exif_config = "/Users/frahof/Development/private/iphoto-google/exif_args.cfg"
 
 
-def find_extensions():
-    extensions = set()
-    for root, dirs, files in os.walk("."):
+def download_archives():
+    # TODO: find a way to not do it manually
+    pass
+
+
+def _remove_dsstore(dir):
+    for root, dirs, files in os.walk(dir):
         for name in files:
-            extension = os.path.splitext(name)[1]
-            if extension == ".zip" or extension == "":
-                continue
-            extensions.add(extension.lower())
-    print(sorted(extensions))
+            if name == ".DS_Store":
+                print(os.path.join(root, name))
+                os.remove(os.path.join(root, name))
 
 
-def print_merge_commands():
-    targetfolder = "/Volumes/Photos/Google Photos/"
-    archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("takeout-")])
-    for archive in archive_dirs:
-        merge_command = f"ditto '{archive}/Takeout/Google Photos' '{targetfolder}'"
-        print(f"echo '{archive}'")
-        print(merge_command)
+def verify_archives(total):
+    for i in range(1, total + 1):
+        archive = f"takeout-20201108T103354Z-{i:03d}.zip"
+        command = f"unzip -qt {archive}"
+        print(archive, os.path.getsize(archive))
+        subprocess.check_call(command.split())
 
 
 def extract_archives():
@@ -42,15 +44,27 @@ def extract_archives():
             subprocess.check_call(command.split())  # , stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-def verify_archives():
-    for i in range(1, 149):
-        archive = f"takeout-20201108T103354Z-{i:03d}.zip"
-        command = f"unzip -qt {archive}"
-        print(archive, os.path.getsize(archive))
-        subprocess.check_call(command.split())
+def print_merge_commands():
+    targetfolder = "/Volumes/Photos/Google Photos/"
+    archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("takeout-")])
+    for archive in archive_dirs:
+        merge_command = f"ditto '{archive}/Takeout/Google Photos' '{targetfolder}'"
+        print(f"echo '{archive}'")
+        print(merge_command)
 
 
-def merge_edited():
+def find_extensions():
+    extensions = set()
+    for root, dirs, files in os.walk("."):
+        for name in files:
+            extension = os.path.splitext(name)[1]
+            if extension == ".zip" or extension == "":
+                continue
+            extensions.add(extension.lower())
+    print(sorted(extensions))
+
+
+def move_edited_to_original():
     for root, dirs, files in os.walk("."):
         for name in files:
             if "-edited." in name:
@@ -60,42 +74,90 @@ def merge_edited():
                 shutil.move(edited, original)
 
 
-def remove_dsstore(dir):
-    for root, dirs, files in os.walk(dir):
+def move_parenthesis_json():
+    pattern = r'(.*)\.(\w+)(\(\d\))\.json'
+    for root, dirs, files in os.walk("."):
         for name in files:
-            if name == ".DS_Store":
-                print(os.path.join(root, name))
-                os.remove(os.path.join(root, name))
+            m = re.match(pattern, name)
+            if m:
+                newname = f"{m[1]}{m[3]}.{m[2]}.json"
+                print(f"{os.path.join(root, name)} -> {newname}")
+                # shutil.move(os.path.join(root, name), os.path.join(root, newname))
 
 
-def exif_fix_archive():
-    archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("takeout-")])
-    # archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("19")])
-    for archive in archive_dirs[1:2]:
-        remove_dsstore(archive)
-        image_extensions = " ".join([f"-ext {format}" for format in image_formats])
-        video_extensions = " ".join([f"-ext {format}" for format in video_formats])
-        commands = [
-            f"exiftool -@ {exif_config} {image_extensions} {archive}",
-            f"exiftool -@ {exif_config} {video_extensions} {archive}"
-        ]
-        for cmd in [commands[1]]:
-            print(cmd)
-            try:
-                stderr_output = subprocess.check_call(cmd.split())  # , stderr=subprocess.STDOUT)
-            except subprocess.CalledProcessError as exc:
-                print("Status : FAIL", exc.returncode, exc.output)
-            else:
-                print(stderr_output)
+def print_exiftool_command():
+    archive_dirs = ['Google Photos']
+    for archive in archive_dirs:
+        _remove_dsstore(archive)
+    image_extensions = " ".join([f"-ext {format}" for format in image_formats])
+    video_extensions = " ".join([f"-ext {format}" for format in video_formats])
+    for ext in [image_extensions, video_extensions]:
+        for archive in archive_dirs:
+            print(f"exiftool -m -@ {exif_config} {ext} '{archive}' 2>errors_videos.log")
+
+
+def find_duplicates():
+    pass
+
+
+def correct_image_errors():
+    for line in open("errors_images.log"):
+        fn, ext = os.path.splitext(line.split(" - ")[1].strip())
+        filename = os.path.join(os.path.abspath("."), fn)
+        extension = ".jpg"
+        if "Not a valid HEIC (looks more like a JPEG)" in line:
+            if os.path.exists(f"{filename + ext}"):
+                shutil.move(f"{filename + ext}", f"{filename}{extension}")
+            if os.path.exists(filename + ext + ".json"):
+                shutil.move(f"{filename + ext}.json", f"{filename}{extension}.json")
+        elif "Not a valid PNG (looks more like a JPEG)" in line:
+            if os.path.exists(f"{filename + ext}"):
+                shutil.move(f"{filename + ext}", f"{filename}{extension}")
+            if os.path.exists(filename + ext + ".json"):
+                shutil.move(f"{filename + ext}.json", f"{filename}{extension}.json")
+        else:
+            continue
+        subprocess.call([
+            "exiftool",
+            "-@",
+            "/Users/frahof/Development/private/iphoto-google/exif_args.cfg",
+            f"{filename}{extension}"
+        ])
+
+
+def correct_video_errors():
+    for line in open("errors_videos.log"):
+        fn, ext = os.path.splitext(line.split(" - ")[1].strip())
+        filename = os.path.join(os.path.abspath("."), fn)
+        if "Warning: Error opening file" in line and ext == ".json":
+            # e2165bff3800a379c3ffcfe489af3ab6.MOV
+            # e2165bff3800a379c3ffcfe489af3ab6.json
+            base, ext = os.path.splitext(filename)
+            if ext == ".MOV":
+                shutil.move(f"{base}.json", f"{fn}.json")
+                subprocess.call([
+                    "exiftool",
+                    "-@",
+                    "/Users/frahof/Development/private/iphoto-google/exif_args.cfg",
+                    f"{fn}"
+                ])
+
+        else:
+            continue
 
 
 if __name__ == "__main__":
     DATA_DIR = "/Volumes/Photos"
     # DATA_DIR = "/Users/frahof/Development/private/iphoto-google/"
     os.chdir(DATA_DIR)
-    # verify_archives
+    # download_archives()
+    # verify_archives(148)
     # extract_archives()
+    # print_merge_commands()
     # find_extensions()
-    # merge_edited()
-    print_merge_commands()
-    # exif_fix_archive()
+    # move_edited_to_original()
+    # move_parenthesis_json()
+    # correct_image_errors()
+    # correct_video_errors()
+    # print_exiftool_command()
+    # find_duplicates()
