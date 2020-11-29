@@ -4,9 +4,11 @@ import shutil
 import subprocess
 import re
 
-video_formats = ['.3gp', '.mov', '.mp4', '.mpg', '.m4v']  # '.m2ts', '.avi' cannot be written by exiftool yet
-image_formats = ['.gif', '.heic', '.jpeg', '.jpg', '.png', '.tiff']
-exif_config = "/Users/frahof/Development/private/iphoto-google/exif_args.cfg"
+ROOTDIR = os.path.abspath(os.path.dirname(__file__))
+
+video_formats = ['.3gp', '.mov', '.mp4', '.mpg', '.m4v', 'wmv']  # '.m2ts', '.avi' cannot be written by exiftool yet
+image_formats = ['.gif', '.heic', '.jpeg', '.jpg', '.png', '.tiff', 'tif']
+exif_config = os.path.join(ROOTDIR, "exif_args.cfg")
 
 
 def download_archives():
