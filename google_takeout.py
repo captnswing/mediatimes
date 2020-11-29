@@ -129,18 +129,16 @@ def move_parenthesis_json():
             if m:
                 newname = f"{m[1]}{m[3]}.{m[2]}.json"
                 print(f"{os.path.join(root, name)} -> {newname}")
-                # shutil.move(os.path.join(root, name), os.path.join(root, newname))
+                shutil.move(os.path.join(root, name), os.path.join(root, newname))
 
 
-def print_exiftool_command():
-    archive_dirs = ['Google Photos']
-    for archive in archive_dirs:
-        _remove_dsstore(archive)
-    image_extensions = " ".join([f"-ext {format}" for format in image_formats])
-    video_extensions = " ".join([f"-ext {format}" for format in video_formats])
-    for ext in [image_extensions, video_extensions]:
-        for archive in archive_dirs:
-            print(f"exiftool -m -@ {exif_config} {ext} '{archive}' 2>errors_videos.log")
+def print_exiftool_command(archive):
+    exif_types = {
+        "images": " ".join([f"-ext {format}" for format in image_formats]),
+        "videos": " ".join([f"-ext {format}" for format in video_formats])
+    }
+    for type, extensions in exif_types.items():
+        print(f"exiftool -m -@ {exif_config} {extensions} '{archive}' 2>errors_{type}.log")
 
 
 def find_duplicates():
