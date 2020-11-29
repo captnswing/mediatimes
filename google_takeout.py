@@ -12,7 +12,7 @@ exif_config = os.path.join(ROOTDIR, "exif_args.cfg")
 
 
 def download_archives():
-    # TODO: find a way to not do it manually
+    # TODO: find a way to do it automatically ¯\_(ツ)_/¯
     pass
 
 
