@@ -24,30 +24,54 @@ def _remove_dsstore(dir):
                 os.remove(os.path.join(root, name))
 
 
-def verify_archives(total):
+def _remove_directories_with_only_one_json_file(dir):
+    print("""find . -type d -exec bash -c "echo -ne '{} '; ls '{}' | wc -l" \; | awk '$NF==1' >r""")
+    print("cat r | awk '{print $1}' | xargs rm -rf {};")
+
+
+def _find_and_remove_corrup_heic(dir):
+    for root, dirs, files in os.walk(dir):
+        for name in files:
+            if not name.lower().endswith(".heic"):
+                continue
+            command = f"identify '{os.path.join(root, name)}' >/dev/null 2>&1"
+            rc = subprocess.call(command, shell=True)
+            if rc:
+                print(f"'{os.path.join(root, name)}'")
+
+
+def verify_archives(tag, total, compression):
     for i in range(1, total + 1):
-        archive = f"takeout-20201108T103354Z-{i:03d}.zip"
-        command = f"unzip -qt {archive}"
+        archive = f"takeout-{tag}-{i:03d}.{compression}"
+        if compression == "zip":
+            command = f"unzip -qt {archive}"
+        elif compression == "tgz":
+            command = f"tar tfz {archive}"
         print(archive, os.path.getsize(archive))
         subprocess.check_call(command.split())
 
 
-def extract_archives():
-    for i, archive in enumerate(sorted(glob.glob('takeout*.zip'))):
+def extract_archives(compression):
+    for i, archive in enumerate(sorted(glob.glob(f"takeout*.{compression}"))):
         targetdir = os.path.splitext(archive)[0]
         if not os.path.exists(targetdir):
-            # command = f"unzip -q -d {targetdir} {archive}"
-            # print(command)
-            # subprocess.check_call(command.split())
-            # https://github.com/adamhathcock/sharpcompress/issues/315#issuecomment-409894957
-            # https://github.com/CocoaPods/CocoaPods/issues/7711#issuecomment-386942543
-            command = f"ditto -V -x -k --sequesterRsrc --rsrc {archive} {targetdir}"
+            if compression == "zip":
+                # command = f"unzip -q -d {targetdir} {archive}"
+                # print(command)
+                # subprocess.check_call(command.split())
+                # https://github.com/adamhathcock/sharpcompress/issues/315#issuecomment-409894957
+                # https://github.com/CocoaPods/CocoaPods/issues/7711#issuecomment-386942543
+                command = f"ditto -V -x -k --sequesterRsrc --rsrc {archive} {targetdir}"
+            elif compression == "tgz":
+                dir = archive.rstrip('.tgz')
+                os.mkdir(f"{dir}")
+                command = f"tar xfz {archive} -C {dir}"
             print(command)
             subprocess.check_call(command.split())  # , stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 def print_merge_commands():
-    targetfolder = "/Volumes/Photos/Google Photos/"
+    targetfolder = os.path.abspath(os.path.join(os.path.curdir, "Google Photos/"))
     archive_dirs = sorted([d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("takeout-")])
     for archive in archive_dirs:
         merge_command = f"ditto '{archive}/Takeout/Google Photos' '{targetfolder}'"
