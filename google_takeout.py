@@ -90,14 +90,35 @@ def find_extensions():
     print(sorted(extensions))
 
 
+def _find_original_file(edited_file):
+    # './Google Photos/2015-04-22-23/IMG_2079-edited.jpg' --> './Google Photos/2015-04-22-23/IMG_2079.JPG'
+    original_base = edited_file.replace("-edited", "").replace("-redigerad", "")
+    candidates = glob.glob(f"{os.path.splitext(original_base)[0]}*")
+    original = [c for c in candidates if not (c.endswith(".json") or "-redigerad" in c or "-edited" in c)]
+    return original
+
+
 def move_edited_to_original():
     for root, dirs, files in os.walk("."):
         for name in files:
-            if "-edited." in name:
+            if name.endswith(".json"):
+                continue
+            elif "-edited" in name or "-redigerad" in name:
                 edited = os.path.join(root, name)
-                original = edited.replace("-edited", "")
-                print(f"{edited} --> {os.path.basename(original)}")
-                shutil.move(edited, original)
+                original = _find_original_file(edited)
+                try:
+                    print(f"{edited} --> {os.path.basename(original[0])}")
+                    shutil.move(edited, original[0])
+                except IndexError:
+                    print("-" * 50)
+                    print(f"skipping {edited}")
+                    print("-" * 50)
+            elif "(1)." in name:
+                edited = os.path.join(root, name)
+                base, ext = os.path.splitext(edited)
+                if not ext in image_formats:
+                    continue
+                print(_find_original_file(edited))
 
 
 def move_parenthesis_json():
