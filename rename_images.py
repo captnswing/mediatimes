@@ -31,8 +31,11 @@ def valid_directory(d):
 # "DateCreated": "2007:07:14"
 # "DateTimeCreated": "2007:07:14 15:46:02+02:00",
 
+
 def get_earliest_date(mediafile):
-    exif_data = subprocess.check_output(["/usr/local/bin/exiftool", "-g", "-j", mediafile])
+    exif_data = subprocess.check_output(
+        ["/usr/local/bin/exiftool", "-g", "-j", mediafile]
+    )
     exif_data = json.loads(exif_data)[0]
     flattened_dict = dict()
     for k in exif_data:
@@ -40,7 +43,7 @@ def get_earliest_date(mediafile):
             continue
         flattened_dict.update(exif_data[k])
     datekeys = [k for k in flattened_dict.keys() if "date" in k.lower()]
-    dateformats = ['YYYY:MM:DD HH:mm:ssZZ', 'YYYY:MM:DD HH:mm:ss', 'YYYY:MM:DD']
+    dateformats = ["YYYY:MM:DD HH:mm:ssZZ", "YYYY:MM:DD HH:mm:ss", "YYYY:MM:DD"]
     # print([merged_dict[dk] for dk in datekeys])
     parsed_dates = []
     for dk in datekeys:
@@ -60,15 +63,18 @@ def grouper(iterable, n):
     return zip_longest(*args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='renames all movie files in a directory with creation date in their name')
+        description="renames all movie files in a directory with creation date in their name"
+    )
     parser.add_argument("targetfolder", type=valid_directory)
     args = parser.parse_args()
     os.chdir(args.targetfolder)
 
     pool = multiprocessing.Pool()
-    mediafiles = [fn for fn in os.listdir(os.curdir) if os.path.isfile(fn) and fn != ".DS_Store"]
+    mediafiles = [
+        fn for fn in os.listdir(os.curdir) if os.path.isfile(fn) and fn != ".DS_Store"
+    ]
     chunk_size = multiprocessing.cpu_count()
     print(len(mediafiles), chunk_size)
     for g in grouper(mediafiles, chunk_size):
@@ -76,7 +82,7 @@ if __name__ == '__main__':
         # print(files)
         dates = pool.map(get_earliest_date, files)
         for i, f in enumerate(files):
-            monthfolder = dates[i].format('YYYY-MM')
+            monthfolder = dates[i].format("YYYY-MM")
             if not os.path.exists(monthfolder):
                 os.makedirs(monthfolder)
             newfn = os.path.join(monthfolder, f)

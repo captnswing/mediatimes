@@ -26,9 +26,10 @@ def get_new_filename(fn):
     return filename
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='renames all movie files in a directory with creation date in their name')
+        description="renames all movie files in a directory with creation date in their name"
+    )
     parser.add_argument("moviefolder", type=valid_directory)
     args = parser.parse_args()
     os.chdir(args.moviefolder)

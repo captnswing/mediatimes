@@ -5,14 +5,20 @@ import datetime
 import json
 import os
 import subprocess
+
 # https://opensource.com/article/18/4/python-datetime-libraries
 import arrow
 
 
 def get_earliest_date(exifdata, dry_run=False):
-    exifdata = {**exifdata['File'], **exifdata['QuickTime']}
+    exifdata = {**exifdata["File"], **exifdata["QuickTime"]}
     datekeys = [k for k in exifdata.keys() if "date" in k.lower()]
-    parsed_dates = [arrow.get(exifdata[dk], ['YYYY:MM:DD HH:mm:ssZZ', 'YYYY:MM:DD HH:mm:ss']).datetime for dk in datekeys]
+    parsed_dates = [
+        arrow.get(
+            exifdata[dk], ["YYYY:MM:DD HH:mm:ssZZ", "YYYY:MM:DD HH:mm:ss"]
+        ).datetime
+        for dk in datekeys
+    ]
     # if dry_run:
     #     print("-"*50)
     #     print(exifdata)
@@ -25,21 +31,27 @@ def get_earliest_date(exifdata, dry_run=False):
 # touch -m -tCCYYMMDDHH.SS <file>
 # SetFile -d "MM/DD/CCYY HH:MM:SS" <file>
 
+
 def correct_dates(mediafile, d=None, dry_run=False):
+
     if not d:
-        exif_data = subprocess.check_output(["/usr/local/bin/exiftool", "-g", "-j", mediafile])
+        exif_data = subprocess.check_output(
+            ["/usr/local/bin/exiftool", "-g", "-j", mediafile]
+        )
         exif_data = json.loads(exif_data)[0]
         d = get_earliest_date(exif_data, dry_run)
-#    assert (type(d) is arrow.Arrow)
-    assert (type(d) is datetime.datetime)
+    #    assert (type(d) is arrow.Arrow)
+    assert type(d) is datetime.datetime
     # https://productforums.google.com/d/msg/photos/oj96JZK14Fs/upbMBWvmAQAJ
-    keys = ["AllDates",
-            "FileModifyDate",
-            # "FileCreateDate", # Windows only
-            "TrackModifyDate",
-            "TrackCreateDate",
-            "MediaModifyDate",
-            "MediaCreateDate"]
+    keys = [
+        "AllDates",
+        "FileModifyDate",
+        # "FileCreateDate", # Windows only
+        "TrackModifyDate",
+        "TrackCreateDate",
+        "MediaModifyDate",
+        "MediaCreateDate",
+    ]
 
     cmd = ["/usr/local/bin/exiftool", "-overwrite_original"]
     templ = f"-{{}}={d}"
@@ -55,11 +67,19 @@ def correct_dates(mediafile, d=None, dry_run=False):
         os.utime(mediafile, (ts, ts))
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='set datetime on individual movie or all movies in a folder')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="set datetime on individual movie or all movies in a folder"
+    )
     parser.add_argument("target")
-    parser.add_argument("targetdate", nargs='?', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d %H:%M'))
-    parser.add_argument("--dry-run", action="store_true", default=False, help="show some output.")
+    parser.add_argument(
+        "targetdate",
+        nargs="?",
+        type=lambda d: datetime.datetime.strptime(d, "%Y-%m-%d %H:%M"),
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", default=False, help="show some output."
+    )
     args = parser.parse_args()
 
     if os.path.isdir(args.target):

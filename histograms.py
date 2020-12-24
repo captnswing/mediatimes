@@ -14,9 +14,10 @@ def valid_directory(d):
         raise argparse.ArgumentTypeError("Not a valid directory: '{0}'.".format(d))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='renames all movie files in a directory with creation date in their name')
+        description="renames all movie files in a directory with creation date in their name"
+    )
     parser.add_argument("targetfolder", type=valid_directory)
     args = parser.parse_args()
 
@@ -26,7 +27,9 @@ if __name__ == '__main__':
         for f in filenames:
             if f.endswith(".txt") or f == ".DS_Store":
                 continue
-            ds = time.strftime("%d", time.localtime(os.stat(os.path.join(directory, f)).st_mtime))
+            ds = time.strftime(
+                "%d", time.localtime(os.stat(os.path.join(directory, f)).st_mtime)
+            )
             a.append(ds)
 
     plot_hist(a)

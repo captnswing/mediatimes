@@ -4,3 +4,5 @@ exif
 *.shelve
 *.ipynb
 .idea
+data
+__pycache__

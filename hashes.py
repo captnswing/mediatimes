@@ -10,7 +10,7 @@ import sys
 def getmd5hash(filename):
     file_hash = hashlib.md5()
     BLOCK_SIZE = 128000000
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         fb = f.read(BLOCK_SIZE)
         while len(fb) > 0:  # While there is still data being read from the file
             file_hash.update(fb)  # Update the hash
@@ -20,9 +20,9 @@ def getmd5hash(filename):
 
 def getallhashes():
     allhashes = []
-    for directory, dirnames, filenames in os.walk('.'):
+    for directory, dirnames, filenames in os.walk("."):
         for filename in filenames:
-            if re.match('^clip-.*\.mov$', filename):
+            if re.match("^clip-.*\.mov$", filename):
                 fn = os.path.join(directory, filename)
                 print(fn)
                 md5h = getmd5hash(fn)
@@ -30,8 +30,10 @@ def getallhashes():
     return allhashes
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='rename movie files according to their hash')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="rename movie files according to their hash"
+    )
     parser.add_argument("targetdir")
     args = parser.parse_args()
     print(args.targetdir)
