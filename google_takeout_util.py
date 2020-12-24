@@ -110,17 +110,6 @@ def find_extensions():
     print(sorted(extensions))
 
 
-def print_merge_commands():
-    targetfolder = os.path.abspath(os.path.join(os.path.curdir, "Google Photos/"))
-    archive_dirs = sorted(
-        [d for d in os.listdir(".") if os.path.isdir(d) and d.startswith("takeout-")]
-    )
-    for archive in archive_dirs:
-        merge_command = f"ditto '{archive}/Takeout/Google Photos' '{targetfolder}'"
-        print(f"echo '{archive}'")
-        print(merge_command)
-
-
 def move_edited_to_original():
     for root, dirs, files in os.walk("."):
         for name in files:
@@ -213,140 +202,6 @@ def _run_exiftool_images(fn):
     print(s)
 
 
-def correct_image_errors():
-    for line in open("errors_images.log"):
-        fn, ext = os.path.splitext(line.split(" - ")[1].strip())
-        filename = os.path.join(os.path.abspath("."), fn)
-        extension = ".jpg"
-        if (
-            "Not a valid HEIC (looks more like a JPEG)" in line
-            or "Not a valid PNG (looks more like a JPEG)" in line
-        ):
-            if os.path.exists(f"{filename + ext}"):
-                shutil.move(f"{filename + ext}", f"{filename}{extension}")
-            if os.path.exists(filename + ext + ".json"):
-                shutil.move(f"{filename + ext}.json", f"{filename}{extension}.json")
-        else:
-            continue
-        _run_exiftool_images(f"{filename}{extension}")
-
-
-def correct_video_errors():
-    for line in open("errors_videos.log"):
-        fn, ext = os.path.splitext(line.split(" - ")[1].strip())
-        filename = os.path.join(os.path.abspath("."), fn)
-        if "Warning: Error opening file" in line and ext == ".json":
-            # e2165bff3800a379c3ffcfe489af3ab6.MOV
-            # e2165bff3800a379c3ffcfe489af3ab6.json
-            base, ext = os.path.splitext(filename)
-            if ext == ".MOV":
-                shutil.move(f"{base}.json", f"{fn}.json")
-                _run_exiftool_videos(fn)
-        else:
-            continue
-
-
-def walk_videos(dir):
-    os.chdir(dir)
-    now = arrow.get(2020, 11, 11, 11, 11, 11)
-    for root, dirs, files in os.walk("."):
-        for name in files:
-            fn = os.path.join(root, name)
-            extension = os.path.splitext(name)[1]
-            if not extension.lower() in video_formats:
-                continue
-            s = subprocess.check_output(
-                [
-                    "exiftool",
-                    "-m",
-                    # unsure if this is right: CreateDate?
-                    # "-CreateDate",
-                    "-DateTimeOriginal",
-                    f"{fn}",
-                ],
-                encoding="utf-8",
-            )
-            date_exiftool = s.split(" : ")[-1].strip()
-            print(date_exiftool)
-            try:
-                date_exiftool = arrow.get(date_exiftool, "YYYY:MM:DD HH:mm:ss")
-            except (arrow.parser.ParserMatchError, ValueError):
-                print(fn, date_exiftool)
-                date_exiftool = now
-            if os.path.exists(f"{fn}.json"):
-                data = json.loads(open(f"{fn}.json").read())
-                date_googlejson = arrow.get(data["photoTakenTime"]["timestamp"], "X")
-            else:
-                # json doesn't exist
-                # remove media file?
-                date_googlejson = now
-            diff = (date_exiftool - date_googlejson).days
-            if diff >= 1:
-                print(
-                    f"{fn:70s} {date_exiftool.datetime:%Y-%m-%d %H:%M}\t\t{date_googlejson.datetime:%Y-%m-%d %H:%M}\t\t{diff}"
-                )
-                try:
-                    _run_exiftool_videos(fn, date_googlejson)
-                except:
-                    continue
-
-
-def walk_images(dir):
-    os.chdir(dir)
-    now = arrow.get(2020, 11, 11, 11, 11, 11)
-    for root, dirs, files in os.walk("."):
-        for name in files:
-            fn = os.path.join(root, name)
-            extension = os.path.splitext(name)[1]
-            if not extension.lower() in image_formats:
-                continue
-            s = subprocess.check_output(
-                ["exiftool", "-m", "-DateTimeOriginal", f"{fn}"], encoding="utf-8"
-            )
-            date_exiftool = s.split(" : ")[-1].strip()
-            try:
-                date_exiftool = arrow.get(date_exiftool, "YYYY:MM:DD HH:mm:ss")
-            except (arrow.parser.ParserMatchError, ValueError):
-                print(fn, date_exiftool)
-                date_exiftool = now
-            if os.path.exists(f"{fn}.json"):
-                data = json.loads(open(f"{fn}.json").read())
-                date_googlejson = arrow.get(data["photoTakenTime"]["timestamp"], "X")
-            else:
-                # json doesn't exist
-                # remove media file?
-                date_googlejson = now
-            diff = (date_exiftool - date_googlejson).days
-            if diff >= 1:
-                print(
-                    f"{fn:110s} {date_exiftool.datetime:%Y-%m-%d %H:%M}\t\t{date_googlejson.datetime:%Y-%m-%d %H:%M}\t\t{diff}"
-                )
-                try:
-                    _run_exiftool_images(fn)
-                except:
-                    continue
-
-
-def remove_duplicates():
-    print(f"fdupes -rdN 'Google Photos' >dupes")
-    # https://stackoverflow.com/a/49567096
-    with open("dupes") as f:
-        group = []
-        for line in f:
-            if line.strip():
-                group.append(line.strip())
-            else:
-                print_dates(group)
-                print("-" * 50)
-                group = []
-        if group:
-            print_dates(group)
-            print("-" * 50)
-    # original = lines[0::2]
-    # copy = lines[1::2]
-    # print(len(original), len(copy))
-
-
 def print_dates(g):
     for fn in g:
         if os.path.splitext(fn)[1] == ".json":
@@ -380,23 +235,12 @@ def move_subfolders_into_batches(dir):
 
 if __name__ == "__main__":
     DATA_DIR = "/Volumes/Photos/frank/"
-    # DATA_DIR = "/Users/frahof/Development/private/iphoto-google/"
     os.chdir(DATA_DIR)
-    # download_archives()
+    download_archives()
     # verify_archives("20201123T165802Z", 32, "tgz")
-    extract_archives("zip")
-    # find_extensions()
-    #
-    # print_merge_commands()
+    # extract_archives("zip")
+    find_extensions()
     # cleanup()
     # move_edited_to_original()
     # move_parenthesis_json()
-    #
-    # walk_images('Google Photos')
-    # correct_image_errors()
-    #
-    # walk_videos('Google Photos')
-    # correct_video_errors()
-    #
-    # remove_duplicates()
     # move_subfolders_into_batches('Google Photos')
