@@ -3,8 +3,11 @@
 import json
 import os
 import subprocess
-from google_takeout_util import video_formats, image_formats
+
+import pandas as pd
 from pymongo import MongoClient
+
+from google_takeout_util import image_formats, video_formats
 
 
 def walk_media(dir, formats):
@@ -27,10 +30,39 @@ def load_media_data(coll, dir):
 
 
 if __name__ == "__main__":
+    pd.set_option("display.width", None)
+    pd.set_option("display.max_columns", None)
+    pd.set_option("display.max_rows", None)
+    pd.set_option("display.max_colwidth", None)
+
     target_dir = "/Volumes/Photos/frank/"
     client = MongoClient("mongodb://mongodb:27017/")
     # client.drop_database("iphoto")
     db = client.iphoto
     media_collection = db.media
     media_collection.create_index([("SourceFile", "text")])
-    load_media_data(media_collection, target_dir)
+    # load_media_data(media_collection, target_dir)
+
+    db.flatfiles.drop()
+    db.command(
+        {
+            "create": "flatfiles",
+            "viewOn": "media",
+            "pipeline": [
+                {
+                    "$project": {
+                        "name": "$File.FileName",
+                        "fn": {"$concat": ["$File.Directory", "/", "$File.FileName"]},
+                        "size": "$File.FileSize",
+                        "createdate": "$EXIF.CreateDate",
+                        "datetimeoriginal": "$EXIF.DateTimeOriginal",
+                    }
+                }
+            ],
+        }
+    )
+
+    mediadf = pd.DataFrame.from_records(db.flatfiles.find({}))
+    del mediadf["_id"]
+    print(mediadf.head(10))
+    print(mediadf.shape)

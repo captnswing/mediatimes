@@ -1,9 +1,9 @@
+import glob
 import json
 import os
-import glob
+import re
 import shutil
 import subprocess
-import re
 from itertools import groupby
 
 import arrow

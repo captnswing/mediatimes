@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import json
 import os
 import re
+import numpy as np
 import pandas as pd
-import arrow
 from pymongo import MongoClient
+
+
+def find_rikard():
+    mediadf = pd.DataFrame.from_records(
+        db.json.find({"people.name": {"$regex": ".*ickard.*"}})
+    )
+    for fn in sorted(mediadf["filename"]):
+        print(fn)
+
+
+def canonical_name(fn):
+    bn = os.path.basename(os.path.splitext(fn)[0])
+    bn = bn.replace("-edited", "")
+    bn = re.sub(r"#\d+", "", bn)
+    bn = re.sub(r"\(\d+\)", "", bn)
+    bn = re.sub(r"[-_]\d$", "", bn)
+    return bn.strip()
+
 
 if __name__ == "__main__":
     pd.set_option("display.width", None)
@@ -21,44 +38,6 @@ if __name__ == "__main__":
     json_collection = db.json
     media_collection = db.media
 
-    db.flatfiles.drop()
-    db.command(
-        {
-            "create": "flatfiles",
-            "viewOn": "media",
-            "pipeline": [
-                {
-                    "$project": {
-                        "name": "$File.FileName",
-                        "folder": "$File.Directory",
-                        "size": "$File.FileSize",
-                        "createdate": "$EXIF.CreateDate",
-                        "datetimeoriginal": "$EXIF.DateTimeOriginal",
-                        "gpsdate": "$Composite.GPSDateTime",
-                    }
-                }
-            ],
-        }
-    )
-    db.flatjson.drop()
-    db.command(
-        {
-            "create": "flatjson",
-            "viewOn": "json",
-            "pipeline": [
-                {
-                    "$project": {
-                        "datetimeoriginal": "$photoTakenTime.formatted",
-                        "folder": "$filename",
-                        "name": "$title",
-                        "tz": "$tzname",
-                        "geoData": "$geoData",
-                    }
-                }
-            ],
-        }
-    )
-
     # jsondf = pd.DataFrame.from_records(
     #     db.flatjson.find({})
     # )
@@ -68,62 +47,31 @@ if __name__ == "__main__":
     mediadf = pd.DataFrame.from_records(db.flatfiles.find({}))
     del mediadf["_id"]
 
-    def canonical_name(fn):
-        bn = os.path.basename(os.path.splitext(fn)[0])
-        bn = bn.replace("-edited", "")
-        bn = re.sub(r"#\d+", "", bn)
-        bn = re.sub(r"\(\d+\)", "", bn)
-        bn = re.sub(r"[-_]\d$", "", bn)
-        return bn.strip()
+    mediadf.replace("    :  :     :  :  ", np.nan, inplace=True)
+    mediadf.replace("0000:00:00 00:00:00", np.nan, inplace=True)
 
-    def canonical_time(row):
-        # print(row.createdate, row.datetimeoriginal, row.gpsdate)
-        if pd.isna(row.createdate):
-            row.createdate = None
-        else:
-            row.createdate = arrow.get(row.createdate, "YYYY:MM:DD HH:mm:ss")
-        if pd.isna(row.datetimeoriginal):
-            row.datetimeoriginal = None
-        else:
-            row.createdate = arrow.get(row.datetimeoriginal, "YYYY:MM:DD HH:mm:ss")
-        if pd.isna(row.gpsdate):
-            row.gpsdate = None
-        else:
-            row.gpsdate = arrow.get(
-                row.gpsdate, ["YYYY:MM:DD HH:mm:ss.SS[Z]", "YYYY:MM:DD HH:mm:ss[Z]"]
-            )
-
-        return row.createdate
-
-    def myDateConv(tt):
-        sep = tt[2]
-        if sep == "-":
-            return pd.to_datetime(tt, format="%d-%m-%Y")
-        elif sep == "/":
-            return pd.to_datetime(tt, format="%m/%d/%Y")
-        else:
-            return tt
-
-    # mediadf.replace("    :  :     :  :  ", np.nan, inplace=True)
-    # mediadf.replace("0000:00:00 00:00:00", np.nan, inplace=True)
-    #
-    # mediadf["canonical_name"] = mediadf["name"].apply(canonical_name)
-    # mediadf["createdate"] = pd.to_datetime(
-    #     mediadf["createdate"], format="%Y:%m:%d %H:%M:%S"
-    # )
-    # mediadf["datetimeoriginal"] = pd.to_datetime(
-    #     mediadf["datetimeoriginal"], format="%Y:%m:%d %H:%M:%S"
-    # )
-    # mediadf["gpsdate"] = pd.to_datetime(
-    #     mediadf["gpsdate"], format="%Y:%m:%d %H:%M:%S[.:]%f[Z]"
-    # )
-    # mediadf["canonical_time"] = mediadf.apply(canonical_time, axis=1)
-    # mediadf.sort_values(by=['canonical_time'])
+    mediadf["canonical_name"] = mediadf["name"].apply(canonical_name)
+    mediadf["createdate"] = pd.to_datetime(
+        mediadf["createdate"], format="%Y:%m:%d %H:%M:%S"
+    )
+    mediadf["datetimeoriginal"] = pd.to_datetime(
+        mediadf["datetimeoriginal"], format="%Y:%m:%d %H:%M:%S"
+    )
+    mediadf["subfolder"] = mediadf["folder"].apply(
+        lambda x: re.sub(".*/Takeout/Google Photos/", "", x)
+    )
+    # mediadf.sort_values(by=['canonical_name'], inplace=True)
     # print(mediadf.head(100))
     # print(mediadf.info())
     # print(mediadf.shape)
-    mediadf = pd.DataFrame.from_records(
-        db.json.find({"people.name": {"$regex": ".*ickard.*"}})
-    )
-    for fn in sorted(mediadf["filename"]):
-        print(fn)
+
+    for n in mediadf["canonical_name"]:
+        rows = mediadf[mediadf["name"].str.contains(n)]
+        rows.sort_values(by=["createdate"], inplace=True)
+        print(rows)
+        break
+        # for r in rows.iterrows():
+        #     print(r)
+        #     if  pd.isna(r.datetimeoriginal):
+        #         print("b")
+        # break
