@@ -47,9 +47,6 @@ if __name__ == "__main__":
     mediadf = pd.DataFrame.from_records(db.flatfiles.find({}))
     del mediadf["_id"]
 
-    mediadf.replace("    :  :     :  :  ", np.nan, inplace=True)
-    mediadf.replace("0000:00:00 00:00:00", np.nan, inplace=True)
-
     mediadf["canonical_name"] = mediadf["name"].apply(canonical_name)
     mediadf["createdate"] = pd.to_datetime(
         mediadf["createdate"], format="%Y:%m:%d %H:%M:%S"

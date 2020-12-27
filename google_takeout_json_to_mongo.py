@@ -76,7 +76,12 @@ if __name__ == "__main__":
                         "tz": "$tzname",
                         "geoData": "$geoData",
                     }
-                }
+                },
+                {
+                    "$addFields": {
+                        "photoTakenTime": {"$toDate": "$photoTakenTime"},
+                    }
+                },
             ],
         }
     )
@@ -85,3 +90,4 @@ if __name__ == "__main__":
     del jsondf["_id"]
     print(jsondf.head(10))
     print(jsondf.shape)
+    print(jsondf.info())
