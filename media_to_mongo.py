@@ -43,6 +43,25 @@ if __name__ == "__main__":
     media_collection.create_index([("SourceFile", "text")])
     # load_media_data(media_collection, target_dir)
 
+    media_collection.update_many(
+        {
+            "$or": [
+                {"EXIF.CreateDate": {"$eq": "0000:00:00 00:00:00"}},
+                {"EXIF.CreateDate": {"$eq": "    :  :     :  :  "}},
+            ]
+        },
+        {"$set": {"EXIF.CreateDate": None}},
+    )
+    media_collection.update_many(
+        {
+            "$or": [
+                {"EXIF.DateTimeOriginal": {"$eq": "0000:00:00 00:00:00"}},
+                {"EXIF.DateTimeOriginal": {"$eq": "    :  :     :  :  "}},
+            ]
+        },
+        {"$set": {"EXIF.DateTimeOriginal": None}},
+    )
+
     db.flatfiles.drop()
     db.command(
         {
@@ -57,7 +76,13 @@ if __name__ == "__main__":
                         "createdate": "$EXIF.CreateDate",
                         "datetimeoriginal": "$EXIF.DateTimeOriginal",
                     }
-                }
+                },
+                {
+                    "$addFields": {
+                        "createdate": {"$toDate": "$createdate"},
+                        "datetimeoriginal": {"$toDate": "$datetimeoriginal"},
+                    }
+                },
             ],
         }
     )
@@ -66,3 +91,4 @@ if __name__ == "__main__":
     del mediadf["_id"]
     print(mediadf.head(10))
     print(mediadf.shape)
+    print(mediadf.info())
