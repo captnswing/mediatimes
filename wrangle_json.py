@@ -2,17 +2,15 @@
 # -*- coding: utf-8 -*-
 import os
 import re
-import numpy as np
-import pandas as pd
+import shutil
+
+from bson import ObjectId
 from pymongo import MongoClient
 
-
-def find_rikard():
-    mediadf = pd.DataFrame.from_records(
-        db.json.find({"people.name": {"$regex": ".*ickard.*"}})
-    )
-    for fn in sorted(mediadf["filename"]):
-        print(fn)
+from google_takeout_util import (
+    image_formats,
+    video_formats,
+)
 
 
 def canonical_name(fn):
@@ -24,51 +22,159 @@ def canonical_name(fn):
     return bn.strip()
 
 
-if __name__ == "__main__":
-    pd.set_option("display.width", None)
-    pd.set_option("display.max_columns", None)
-    pd.set_option("display.max_rows", None)
-    # pd.set_option('display.max_colwidth', -1)
+def process_clean_cases(df):
+    dates_agree = df[df["createdate"] == df["datetimeoriginal"]]
+    dates_agree = dates_agree[
+        ~dates_agree.duplicated(subset=["canonical_name", "size"])
+    ]
+    dates_agree = dates_agree.sort_values(by=["canonical_name"])
+    print(dates_agree.sample(20))
+    print(dates_agree.shape)
+    with open("/tmp/frank_doit.sh", "w+") as f:
+        for row in dates_agree.itertuples():
+            msg = f"mkdir -p '/Volumes/Photos/frank_import/{os.path.dirname(row.subfolder)}'\n"
+            print(msg, end="")
+            f.write(msg)
+            msg = f"cp '{row.fn_x}' '/Volumes/Photos/frank_import/{row.subfolder}'\n"
+            print(msg, end="")
+            f.write(msg)
 
-    # load_json_data()
+
+def process_file(f, d):
+    bn, ext = os.path.splitext(f.fn_x)
+    if ext.lower() in video_formats:
+        print(f.fn_x, d, ext)
+
+    elif ext.lower() in image_formats:
+        pass
+    else:
+        print("DONTKNOWHOWTOHANDLE")
+
+
+def process_corner_cases(df):
+    rest = df[df["createdate"] != df["datetimeoriginal"]]
+    rest = rest.sort_values(by=["canonical_name"])
+    a = rest.groupby("canonical_name").first()
+    a.fillna(value=np.nan, inplace=True)
+    a = a[a.createdate.isnull() | a.datetimeoriginal.isnull()]
+    a["extension"] = a["fn_x"].apply(lambda x: os.path.splitext(x)[1].lower())
+    print(set(a["extension"].to_list()))
+    images = a[a["extension"].isin(image_formats)]
+    videos = a[a["extension"].isin(video_formats)]
+    print(rest.info())
+    print(a.info())
+    print(images.info())
+    print(videos.info())
+
+    with open("/tmp/frank_doit.sh", "w+") as f:
+        msg = f"mkdir -p '/Users/frahof/frank_import/BAD'\n"
+        f.write(msg)
+        for row in videos.itertuples():
+            msg = f"mkdir -p '/Users/frahof/frank_import/{os.path.dirname(row.subfolder)}'\n"
+            f.write(msg)
+            msg = f"cp -p '{row.fn_x}' '/Users/frahof/frank_import/{row.subfolder}'\n"
+            f.write(msg)
+            new_fn = f"/Users/frahof/frank_import/{row.subfolder}"
+            # print(new_fn)
+            if not pd.isnull(row.createdate):
+                msg = f"exiftool -m -overwrite_original -DateTimeOriginal='{row.createdate}' '{new_fn}'\n"
+                f.write(msg)
+            elif not pd.isnull(row.datetimeoriginal):
+                msg = f"exiftool -m -overwrite_original -CreateDate='{row.datetimeoriginal}' '{new_fn}'\n"
+                f.write(msg)
+            elif not pd.isnull(row.photoTakenTime):
+                msg = f"exiftool -m -overwrite_original -DateTimeOriginal='{row.photoTakenTime}' -CreateDate='{row.photoTakenTime}' '{new_fn}'\n"
+                f.write(msg)
+            else:
+                print(f"no timestamp for '{new_fn}'")
+                msg = f"mv '{new_fn}' /Users/frahof/frank_import/BAD\n"
+                f.write(msg)
+
+
+def _find_original_record(edited_record):
+    # './Google Photos/2015-04-22-23/IMG_2079-edited.jpg' --> './Google Photos/2015-04-22-23/IMG_2079.JPG'
+    original_base = (
+        edited_record["SourceFile"].replace("-edited", "").replace("-redigerad", "")
+    )
+    myregexp = f".*{os.path.splitext(original_base)[0]}\..*"
+    # print(myregexp)
+    original_record = db.flatjson.find_one(
+        {
+            "$and": [
+                {"SourceFile": {"$regex": myregexp}},
+                {"MIMEType": {"$eq": edited_record["MIMEType"]}},
+            ]
+        }
+    )
+    return original_record
+
+
+def move_edited_to_original(target_dir):
+    os.chdir(target_dir)
+    edited = db.flatjson.find(
+        {
+            "$or": [
+                {"SourceFile": {"$regex": ".*-redigerad.*"}},
+                {"SourceFile": {"$regex": ".*-edited.*"}},
+            ]
+        }
+    )
+    for e in edited:
+        o = _find_original_record(e)
+        if not o:
+            continue
+        print(f"{e['SourceFile']} --> {os.path.basename(o['SourceFile'])}")
+        shutil.move(e["SourceFile"], o["SourceFile"])
+        db.media.delete_one({"_id": ObjectId(e["_id"])})
+
+
+def fix_wrong_heic(target_dir):
+    os.chdir(target_dir)
+    wrong = db.flatjson.find(
+        {
+            "$and": [
+                {"FileName": {"$regex": ".*\HEIC$"}},
+                {"MIMEType": {"$ne": "image/heic"}},
+            ]
+        }
+    )
+    for w in wrong:
+        fn, ext = os.path.splitext(w["SourceFile"])
+        new_ext = ""
+        if w["MIMEType"] == "image/jpeg":
+            new_ext = ".jpg"
+        elif w["MIMEType"] == "video/mp4":
+            new_ext = ".mp4"
+        elif w["MIMEType"] == "video/quicktime":
+            new_ext = ".mov"
+        if not new_ext:
+            print("-" * 50)
+            print(w)
+            print("-" * 50)
+            continue
+
+        print(f"move {w['SourceFile']} {fn}{new_ext}")
+        shutil.move(w["SourceFile"], f"{fn}{new_ext}")
+        db.media.update_one(
+            {"_id": w["_id"]},
+            {
+                "$set": {
+                    "SourceFile": w["SourceFile"].replace(ext, new_ext),
+                    "FileName": w["FileName"].replace(ext, new_ext),
+                }
+            },
+            upsert=False,
+        )
+
+
+if __name__ == "__main__":
     target_dir = "/Volumes/Photos/frank/"
     client = MongoClient("mongodb://mongodb:27017/")
-    # client.drop_database("iphoto")
     db = client.iphoto
-    json_collection = db.json
     media_collection = db.media
 
-    # jsondf = pd.DataFrame.from_records(
-    #     db.flatjson.find({})
-    # )
-    # del jsondf['_id']
-    # print(jsondf.head(10))
-    # print(jsondf.shape)
-    mediadf = pd.DataFrame.from_records(db.flatfiles.find({}))
-    del mediadf["_id"]
-
-    mediadf["canonical_name"] = mediadf["name"].apply(canonical_name)
-    mediadf["createdate"] = pd.to_datetime(
-        mediadf["createdate"], format="%Y:%m:%d %H:%M:%S"
-    )
-    mediadf["datetimeoriginal"] = pd.to_datetime(
-        mediadf["datetimeoriginal"], format="%Y:%m:%d %H:%M:%S"
-    )
-    mediadf["subfolder"] = mediadf["folder"].apply(
-        lambda x: re.sub(".*/Takeout/Google Photos/", "", x)
-    )
-    # mediadf.sort_values(by=['canonical_name'], inplace=True)
-    # print(mediadf.head(100))
-    # print(mediadf.info())
-    # print(mediadf.shape)
-
-    for n in mediadf["canonical_name"]:
-        rows = mediadf[mediadf["name"].str.contains(n)]
-        rows.sort_values(by=["createdate"], inplace=True)
-        print(rows)
-        break
-        # for r in rows.iterrows():
-        #     print(r)
-        #     if  pd.isna(r.datetimeoriginal):
-        #         print("b")
-        # break
+    # move_edited_to_original(target_dir)
+    # fix_wrong_heic(target_dir)
+    # fix missing date images
+    # fix missing date videos
+    # fix video format
