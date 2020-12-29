@@ -25,7 +25,7 @@ if __name__ == "__main__":
     media_collection.create_index([("SourceFile", "text")])
     # load_media_data(media_collection, target_dir)
 
-    remove = db.media.find(
+    remove = media_collection.find(
         {
             "$or": [
                 {"FileName": "shared_album_comments.json"},
@@ -40,9 +40,13 @@ if __name__ == "__main__":
         try:
             os.remove(r["SourceFile"])
         except FileNotFoundError:
+            # assume the remove happened already in an earlier run
             pass
         db.media.delete_one(r)
 
+    media_collection.delete_many(
+        {"MIMEType": {"$eq": "application/zip"}}
+    )
     media_collection.update_many(
         {
             "$or": [

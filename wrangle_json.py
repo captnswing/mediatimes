@@ -111,7 +111,7 @@ def _find_original_record(edited_record):
 
 def move_edited_to_original(target_dir):
     os.chdir(target_dir)
-    edited = db.flatjson.find(
+    edited = media_collection.find(
         {
             "$or": [
                 {"SourceFile": {"$regex": ".*-redigerad.*"}},
@@ -121,16 +121,19 @@ def move_edited_to_original(target_dir):
     )
     for e in edited:
         o = _find_original_record(e)
-        if not o:
-            continue
-        print(f"{e['SourceFile']} --> {os.path.basename(o['SourceFile'])}")
-        shutil.move(e["SourceFile"], o["SourceFile"])
+        if o:
+            print(f"{e['SourceFile']} --> {os.path.basename(o['SourceFile'])}")
+            try:
+                shutil.move(e["SourceFile"], o["SourceFile"])
+            except FileNotFoundError:
+                # assume the move happened already in an earlier run
+                pass
         db.media.delete_one({"_id": ObjectId(e["_id"])})
 
 
 def fix_wrong_heic(target_dir):
     os.chdir(target_dir)
-    wrong = db.flatjson.find(
+    wrong = media_collection.find(
         {
             "$and": [
                 {"FileName": {"$regex": ".*\HEIC$"}},
@@ -154,7 +157,11 @@ def fix_wrong_heic(target_dir):
             continue
 
         print(f"move {w['SourceFile']} {fn}{new_ext}")
-        shutil.move(w["SourceFile"], f"{fn}{new_ext}")
+        try:
+            shutil.move(w["SourceFile"], f"{fn}{new_ext}")
+        except FileNotFoundError:
+            # assume the move happened already in an earlier run
+            pass
         db.media.update_one(
             {"_id": w["_id"]},
             {
@@ -173,8 +180,9 @@ if __name__ == "__main__":
     db = client.iphoto
     media_collection = db.media
 
-    # move_edited_to_original(target_dir)
+    move_edited_to_original(target_dir)
     # fix_wrong_heic(target_dir)
+    # duplicate images/videos
     # fix missing date images
     # fix missing date videos
     # fix video format
