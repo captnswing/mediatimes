@@ -44,9 +44,7 @@ if __name__ == "__main__":
             pass
         db.media.delete_one(r)
 
-    media_collection.delete_many(
-        {"MIMEType": {"$eq": "application/zip"}}
-    )
+    media_collection.delete_many({"MIMEType": {"$eq": "application/zip"}})
     media_collection.update_many(
         {
             "$or": [
@@ -80,6 +78,7 @@ if __name__ == "__main__":
                         "FileSize": "$FileSize",
                         "FileTypeExtension": "$FileTypeExtension",
                         "MIMEType": "$MIMEType",
+                        "CompressorName": "$CompressorName",
                         "DateTimeOriginal": "$DateTimeOriginal",
                         "CreateDate": "$CreateDate",
                         "ContentCreateDate": "$ContentCreateDate",
